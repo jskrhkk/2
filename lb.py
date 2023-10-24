@@ -4,6 +4,8 @@ from tkinter import ttk
 from tkinter.messagebox import showerror
 from tkinter.messagebox import showinfo
 import re
+import pandas as pd
+
 # описываем класс Окно
 class Main_Window():
     def __init__(self):
@@ -416,6 +418,70 @@ class Types_Window(Provider_Window):
     def quit_win(self):
         self.root2.destroy()
         self.main_view.root.deiconify()
+
+
+class Book_window():
+    def __init__(self):
+        self.root2 = tk.Tk()
+        self.root2.geometry("800x400")
+        self.root2.title("Магазин музыкальных инструментов/Музыкальные Инструменты")
+        self.root2.protocol('WM_DELETE_WINDOW', lambda: self.quit_win())  # перехват кнопки Х
+        self.main_view = win
+        self.db = db
+        self.label = tk.Label(self.root2, text="Музыкальные Инструменты")
+        self.label.pack(anchor='nw')
+        self.button_toexcel = tk.Button(self.root2, text="Экспорт в Excel", command=self.toexcel_book)
+        self.button_toexcel.pack(anchor='nw', expand=1)
+        self.tree = ttk.Treeview(self.root2, columns=('id_instrument', 'name', 'type', 'price'), height=15, show='headings')
+        self.tree.column("id_instrument", width=100, anchor=tk.NW)
+        self.tree.column("name", width=100, anchor=tk.NW)
+        self.tree.column("type", width=110, anchor=tk.CENTER)
+        self.tree.column("price", width=100, anchor=tk.CENTER)
+        self.tree.heading("id_instrument", text='Id_инструмента')
+        self.tree.heading("name", text='Название')
+        self.tree.heading("type", text='Id_вид_инструмента')
+        self.tree.heading("price", text='Цена (руб.)')
+        # Полоса прокрутки
+        self.scroll_bar = ttk.Scrollbar(self.root2, command=self.tree.yview)
+        self.tree['yscrollcommand'] = self.scroll_bar.set
+        self.scroll_bar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tree.pack()
+        self.button_quit = tk.Button(self.root2, text="Закрыть", command=lambda: self.quit_win())
+        self.button_quit.pack(anchor='sw', expand=1)
+        self.view_records_book()
+    def record(self, id_instrument, name, type, price):
+        '''обновление и вызов функции для отображения данных'''
+        self.db.save_data_book(id_instrument, name, type, price)
+        self.view_records_book()
+    def view_records_book(self):
+        '''отобразить данные таблицы Книги'''
+        self.db.c.execute('''SELECT id_instrument, name, id_type, price FROM musical_instrument''')
+        [self.tree.delete(i) for i in self.tree.get_children()]  # очистить таблицу для последующего обновления
+        [self.tree.insert('', 'end', values=row) for row in self.db.c.fetchall()]
+    def update_records_book(self, name, type, price):
+        self.db.c.execute('''UPDATE book SET id_instrument=?, name=?, id_type=?, price=?, WHERE ID=?''',
+                          (id_instrument, name, type, price, self.tree.set(self.tree.selection()[0], '#1')))
+        self.db.conn.commit()
+        self.view_records_book()
+    def quit_win(self):
+        self.root2.destroy()
+        self.main_view.root.deiconify()
+    def toexcel_book(self):
+        self.db.c.execute('''SELECT * FROM musical_instrument''')
+        book_list = self.db.c.fetchall()
+        # Используем словарь для заполнения DataFrame
+        # Ключи в словаре — это названия колонок. А значения - строки с информацией
+        df = pd.DataFrame({'Id_инструмента': [el[1] for el in book_list],
+                           'Название': [el[2] for el in book_list],
+                           'Цена (руб.)': [el[3] for el in book_list],
+                           'Вид инструмента': [el[8] for el in book_list]})
+        # указажем writer библиотеки
+        writer = pd.ExcelWriter('example.xlsx', engine='xlsxwriter')
+        # записшем наш DataFrame в файл
+        df.to_excel(writer, 'Sheet1')
+        # сохраним результат
+        writer.save()
+
 
 class DB:
     def __init__(self):
