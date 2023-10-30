@@ -1,8 +1,8 @@
-import sqlite3
+import sqlite3, sys, os
 import tkinter as tk
 from tkinter import ttk
-from tkinter.messagebox import showerror
-from tkinter.messagebox import showinfo
+import customtkinter as ctk
+from tkinter.messagebox import showerror, showinfo
 import re
 import pandas as pd
 
@@ -23,23 +23,28 @@ class Main_Window():
         self.book_menu = tk.Menu(tearoff=0)  # подменю
         self.otch_menu = tk.Menu(tearoff=0)  # подменю
         self.help_menu = tk.Menu(tearoff=0)  # подменю
+
+        self.main_menu.add_cascade(label="Файл", menu=self.file_menu)
         self.file_menu.add_command(label="Выход", command=quit)
+
+        self.main_menu.add_cascade(label="Справочники", menu=self.ref_menu)
         self.ref_menu.add_command(label="Поставщики", command=self.open_win_provider)
         self.ref_menu.add_command(label="Музыкальные Инструменты", command=self.open_win_name)
         self.ref_menu.add_command(label="Виды инструментов",command=self.open_win_types)
+
+        self.main_menu.add_cascade(label="Музыкальные инструменты", menu=self.book_menu)
         self.book_menu.add_command(label='Поступление музыкальных инструментов')
         self.book_menu.add_command(label='Список музыкальных инструментов',command=self.open_win_book)
         self.book_menu.add_command(label='Продажа музыкальных инструментов')
+
+        self.main_menu.add_cascade(label="Отчеты", menu=self.otch_menu)
         self.otch_menu.add_command(label="Отчет по поступлению")
         self.otch_menu.add_command(label="Отчет по остаткам")
         self.otch_menu.add_command(label="Отчет по продажам")
+
+        self.main_menu.add_cascade(label="Справка", menu=self.help_menu)
         self.help_menu.add_command(label="Руководство пользователя")
         self.help_menu.add_command(label="О программе")
-        self.main_menu.add_cascade(label="Файл", menu=self.file_menu)
-        self.main_menu.add_cascade(label="Справочники", menu=self.ref_menu)
-        self.main_menu.add_cascade(label="Музыкальные инструменты", menu=self.book_menu)
-        self.main_menu.add_cascade(label="Отчеты", menu=self.otch_menu)
-        self.main_menu.add_cascade(label="Справка", menu=self.help_menu)
         # привязываем меню к созданному окну
         self.root.config(menu=self.main_menu)
     def open_win_provider(self):
@@ -129,7 +134,8 @@ class Provider_Window():
         elif not result or len(info_list_pr[2]) != 13:  # валидация номера телефона для поля ввода
             showerror(title="Ошибка", message="Номер телефона должен быть в формате +375xxxxxxxxx, где x представляет цифру")
         else:
-            self.db.c.execute('''INSERT INTO provider(name_provider, adress, contact_information) VALUES (?, ?, ?)''', (info_list_pr[0], info_list_pr[1], info_list_pr[2]))
+            self.db.c.execute('''INSERT INTO provider(name_provider, adress, contact_information) VALUES (?, ?, ?)''',
+                              (info_list_pr[0], info_list_pr[1], info_list_pr[2]))
             self.db.conn.commit()
             self.view_info()
             self.ename.delete(0, tk.END)
@@ -201,8 +207,8 @@ class Name_Window():
         self.main_view = win
         self.db = db
         # фреймы
-        self.table_frame = tk.Frame(self.root2, bg='green')
-        self.add_edit_frame = tk.Frame(self.root2, bg='red')
+        self.table_frame = tk.Frame(self.root2, bg='grey')
+        self.add_edit_frame = tk.Frame(self.root2, bg='white')
         self.table_frame.place(relx=0, rely=0, relheight=1, relwidth=0.6)
         self.add_edit_frame.place(relx=0.6, rely=0, relheight=1, relwidth=0.4)
         # таблица
@@ -327,8 +333,8 @@ class Types_Window(Provider_Window):
         self.main_view = win
         self.db = db
         # фреймы
-        self.table_frame = tk.Frame(self.root2, bg='green')
-        self.add_edit_frame = tk.Frame(self.root2, bg='red')
+        self.table_frame = tk.Frame(self.root2, bg='grey')
+        self.add_edit_frame = tk.Frame(self.root2, bg='black')
         self.table_frame.place(relx=0, rely=0, relheight=1, relwidth=0.6)
         self.add_edit_frame.place(relx=0.6, rely=0, relheight=1, relwidth=0.4)
         # таблица
@@ -411,8 +417,7 @@ class Types_Window(Provider_Window):
     def search_info(self):
         '''Кнопка Найти'''
         info = ('%' + self.esearch.get() + '%',)
-        self.db.c.execute('''SELECT type FROM type 
-                          WHERE type LIKE ?''', info)
+        self.db.c.execute('''SELECT type FROM type WHERE type LIKE ?''', info)
         [self.table_pr.delete(i) for i in self.table_pr.get_children()]  # очистить таблицу для последующего обновления
         [self.table_pr.insert('', 'end', values=row) for row in self.db.c.fetchall()]
     def quit_win(self):
@@ -458,7 +463,7 @@ class Book_window():
         self.db.c.execute('''SELECT id_instrument, name, id_type, price FROM musical_instrument''')
         [self.tree.delete(i) for i in self.tree.get_children()]  # очистить таблицу для последующего обновления
         [self.tree.insert('', 'end', values=row) for row in self.db.c.fetchall()]
-    def update_records_book(self, name, type, price):
+    def update_records_book(self, id_instrument, name, type, price):
         self.db.c.execute('''UPDATE book SET id_instrument=?, name=?, id_type=?, price=?, WHERE ID=?''',
                           (id_instrument, name, type, price, self.tree.set(self.tree.selection()[0], '#1')))
         self.db.conn.commit()
@@ -466,22 +471,19 @@ class Book_window():
     def quit_win(self):
         self.root2.destroy()
         self.main_view.root.deiconify()
+
     def toexcel_book(self):
         self.db.c.execute('''SELECT * FROM musical_instrument''')
         book_list = self.db.c.fetchall()
-        # Используем словарь для заполнения DataFrame
-        # Ключи в словаре — это названия колонок. А значения - строки с информацией
-        df = pd.DataFrame({'Id_инструмента': [el[1] for el in book_list],
-                           'Название': [el[2] for el in book_list],
-                           'Цена (руб.)': [el[3] for el in book_list],
-                           'Вид инструмента': [el[8] for el in book_list]})
-        # указажем writer библиотеки
-        writer = pd.ExcelWriter('example.xlsx', engine='xlsxwriter')
-        # записшем наш DataFrame в файл
-        df.to_excel(writer, 'Sheet1')
-        # сохраним результат
-        writer.save()
 
+        # Create a DataFrame from the fetched data
+        df = pd.DataFrame({'Id_инструмента': [el[0] for el in book_list],
+                           'Название': [el[1] for el in book_list],
+                           'Цена (руб.)': [el[2] for el in book_list],
+                           'Вид инструмента': [el[3] for el in book_list]})
+
+        # Save the DataFrame to an Excel file
+        df.to_excel('musical_instruments.xlsx', sheet_name='Sheet1', engine='xlsxwriter')
 
 class DB:
     def __init__(self):
